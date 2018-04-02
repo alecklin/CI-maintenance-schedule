@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_snc_ci_maint.MaintenanceAjax</api_name>
+        <caller_access/>
+        <client_callable>true</client_callable>
+        <description>Client-callable AJAX functions for CI Maintenance.</description>
+        <name>MaintenanceAjax</name>
+        <script><![CDATA[/* 
+*   Author: Aleck.Lin@ServiceNow.com  
+*/
+
+var MaintenanceAjax = Class.create();
+
+MaintenanceAjax.prototype = Object.extendsObject(global.AbstractAjaxProcessor, {
+
+	ajaxFunction_timedMaintenance: function() {
+		var gdt = new GlideDateTime(); //Capture the time right now
+gs.info("got here!");
+		var time = this.getParameter("sysparm_time"); //in minutes
+		var sysIdList = this.getParameter("sysparm_ci_sys_ids");	
+		
+        gdt.addSeconds(time*60); //Add when to take the CIs out of maintenance
+gs.info("got here2!");		
+		var sysIdArr = (sysIdList.toString()+'').split(","); //Convert it from Java object to Javascript array
+		
+		var ciArr = [];
+		var ciState = {};
+		
+		var gr = new GlideRecord('cmdb_ci');
+		gr.addQuery('sys_id', sysIdArr);
+		gr.query();
+		while (gr.next()) {
+			var previousState = gr.install_status+'';
+			
+			if (gr.installed_status == 3)
+				continue;
+			
+			gr.setValue('install_status', 3);
+			gr.update();
+			
+			ciArr.push(gr.sys_id+'');
+			ciState[gr.sys_id+''] = previousState;			
+		}
+
+gs.info("got here3!");		
+		
+		this._scheduleEndOfMaintenance(ciArr, gdt, ciState);
+
+		return true;
+	},
+	
+	_scheduleEndOfMaintenance: function(ciArr, gdt, ciState) {
+gs.info("got here4!");				
+		var scriptToRun = 			
+            "gs.info('Running end of maintenance script!');\n" +        
+			"new x_snc_ci_maint.MaintenanceAjax().endMaintenance('" + ciArr.toString() + "','" + global.JSON.stringify(ciState) + "');\n" +            
+			"gs.info('Finish running maintenance script!');\n";           
+      
+gs.info("got here5!");		
+		new global.GlideRunScriptJob().scheduleScript(scriptToRun, null ,gdt);					
+gs.info("got here6!");				
+	},
+
+	endMaintenance: function(ciArrStr, ciStateJSON) {
+		var sysIdArr = ciArrStr.split(",");
+		var ciState = new JSON().decode(ciStateJSON);
+				
+		var gr = new GlideRecord('cmdb_ci');
+		gr.addQuery('sys_id', sysIdArr);
+		gr.query();
+		while (gr.next()) {
+			var previousState = ciState[gr.sys_id+''];
+			
+			gr.setValue('install_status', previousState);
+			gr.update();					
+		}
+		
+	},
+	
+	
+});]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>aleck.lin</sys_created_by>
+        <sys_created_on>2018-04-01 06:31:00</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
+        <sys_id>fbb0018413511b403b3a53b32244b08a</sys_id>
+        <sys_mod_count>4</sys_mod_count>
+        <sys_name>MaintenanceAjax</sys_name>
+        <sys_package display_value="CI Maintenance Schedule" source="x_snc_ci_maint">04b00d4413511b403b3a53b32244b056</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
+        <sys_scope display_value="CI Maintenance Schedule">04b00d4413511b403b3a53b32244b056</sys_scope>
+        <sys_update_name>sys_script_include_fbb0018413511b403b3a53b32244b08a</sys_update_name>
+        <sys_updated_by>aleck.lin</sys_updated_by>
+        <sys_updated_on>2018-04-01 06:54:05</sys_updated_on>
+    </sys_script_include>
+</record_update>
